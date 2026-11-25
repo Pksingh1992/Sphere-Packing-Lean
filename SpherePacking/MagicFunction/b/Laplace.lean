@@ -1,53 +1,33 @@
+module
 
-import Mathlib.Analysis.Calculus.ParametricIntegral
-import Mathlib.Analysis.Meromorphic.Order
+public import SpherePacking.MagicFunction.b.AnalyticContinuation
+
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
-import Mathlib.MeasureTheory.Integral.Asymptotics
-import Mathlib.Analysis.Analytic.Constructions
-import Mathlib.Analysis.Complex.Basic
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Deriv
-import Mathlib.Tactic
+
+/-!
+# Regularized Laplace formula for `b`
+
+Proposition 7.41 subtracts the two leading exponential terms from the Laplace integrand.
+The continuation proof clears the denominators before applying the real analytic identity theorem.
+-/
+
+@[expose] public section
+
 open MeasureTheory
 open scoped Real Topology
+
 noncomputable section
+
+namespace MagicFunction
 
 def bIntegrand (psi : ℂ → ℂ) (r t : ℝ) : ℂ :=
   (psi (Complex.I * (t : ℂ)) - 144 -
     (Real.exp (2 * Real.pi * t) : ℂ)) *
     (Real.exp (-Real.pi * r ^ 2 * t) : ℂ)
 
-/-- The right side of the submitted theorem, with corrected parentheses. -/
-
-def proposedRhs (psi : ℂ → ℂ) (r : ℝ) : ℂ :=
-  4 * Complex.I * (Real.sin (Real.pi * r ^ 2 / 2) ^ 2 : ℂ) *
-    (((144 / (Real.pi * r ^ 2) +
-      1 / (Real.pi * (r ^ 2 - 2)) : ℝ) : ℂ) +
-      ∫ t in Set.Ioi (0 : ℝ), bIntegrand psi r t)
-
-/-- At r = 2 the sine factor forces the proposed right side to vanish. -/
-
-theorem proposedRhs_two (psi : ℂ → ℂ) : proposedRhs psi 2 = 0 := by
-  have hangle : Real.pi * (2 : ℝ) ^ 2 / 2 = 2 * Real.pi := by ring
-  simp [proposedRhs, hangle, Real.sin_two_pi]
-
-/-- The assumptions on r alone cannot imply the proposed formula. -/
-
-theorem no_unrestricted_formula (psi : ℂ → ℂ) :
-    ¬ (∀ (b : ℝ → ℂ) (r : ℝ),
-      0 ≤ r → r ≠ 0 → r ^ 2 ≠ 2 →
-      b r = proposedRhs psi r) := by
-  intro h
-  have hbad := h (fun _ => 1) 2
-    (by norm_num) (by norm_num) (by norm_num)
-  rw [proposedRhs_two] at hbad
-  exact one_ne_zero hbad
-/--
-The real analytic continuation step used after clearing denominators.
-This is a general helper, not a proof that the contour integrals or the
-regularized integral have the required analyticity.
--/
-
-theorem eq_on_positive_of_analytic_of_eq_above_two
+/-- Apply the analytic identity theorem on the positive real axis. -/
+private theorem eq_on_positive_of_analytic_of_eq_above_two
     {f g : ℝ → ℂ}
     (hf : AnalyticOnNhd ℝ f (Set.Ioi (0 : ℝ)))
     (hg : AnalyticOnNhd ℝ g (Set.Ioi (0 : ℝ)))
@@ -63,10 +43,9 @@ theorem eq_on_positive_of_analytic_of_eq_above_two
 
 
 /-- A real exponential, viewed as a complex-valued integrand. -/
+private def expKernel (a t : ℝ) : ℂ := (Real.exp (-a * t) : ℂ)
 
-def expKernel (a t : ℝ) : ℂ := (Real.exp (-a * t) : ℂ)
-
-theorem integrableOn_expKernel {a : ℝ} (ha : 0 < a) :
+private theorem integrableOn_expKernel {a : ℝ} (ha : 0 < a) :
     IntegrableOn (expKernel a) (Set.Ioi (0 : ℝ)) := by
   have hneg : (-(a : ℂ)).re < 0 := by
     simp only [Complex.neg_re, Complex.ofReal_re]
@@ -78,7 +57,7 @@ theorem integrableOn_expKernel {a : ℝ} (ha : 0 < a) :
   exact integrableOn_exp_mul_complex_Ioi
     (a := -(a : ℂ)) hneg 0
 
-theorem integral_expKernel {a : ℝ} (ha : 0 < a) :
+private theorem integral_expKernel {a : ℝ} (ha : 0 < a) :
     (∫ t in Set.Ioi (0 : ℝ), expKernel a t) = 1 / (a : ℂ) := by
   have hneg : (-(a : ℂ)).re < 0 := by
     simp only [Complex.neg_re, Complex.ofReal_re]
@@ -90,13 +69,11 @@ theorem integral_expKernel {a : ℝ} (ha : 0 < a) :
 
 
 /-- The regularized Laplace transform. Its integrability is not automatic. -/
-
 def regularizedIntegral (psi : ℂ → ℂ) (r : ℝ) : ℂ :=
   ∫ t in Set.Ioi (0 : ℝ), bIntegrand psi r t
 
 /-- Pointwise algebra for the two terms being subtracted. -/
-
-theorem bIntegrand_eq (psi : ℂ → ℂ) (r t : ℝ) :
+private theorem bIntegrand_eq (psi : ℂ → ℂ) (r t : ℝ) :
     bIntegrand psi r t =
       psi (Complex.I * (t : ℂ)) * expKernel (Real.pi * r ^ 2) t -
       144 * expKernel (Real.pi * r ^ 2) t -
@@ -113,18 +90,15 @@ theorem bIntegrand_eq (psi : ℂ → ℂ) (r t : ℝ) :
   rw [he]
   simp only [neg_mul]
 /--
-The integral computation in the range needed to seed continuation.
-The weaker bound r > 2 is sufficient for that purpose.
+The integral computation when both subtracted exponential terms have convergent integrals.
 -/
-
-theorem laplace_regularization (psi : ℂ → ℂ) {r : ℝ} (hr : 2 < r)
+private theorem laplace_regularization (psi : ℂ → ℂ) {r : ℝ} (hsq : 2 < r ^ 2)
     (hreg : IntegrableOn (bIntegrand psi r) (Set.Ioi (0 : ℝ))) :
     (∫ t in Set.Ioi (0 : ℝ),
         psi (Complex.I * (t : ℂ)) * expKernel (Real.pi * r ^ 2) t) =
       144 / ((Real.pi * r ^ 2 : ℝ) : ℂ) +
       1 / ((Real.pi * (r ^ 2 - 2) : ℝ) : ℂ) +
       regularizedIntegral psi r := by
-  have hsq : 2 < r ^ 2 := by nlinarith [sq_nonneg (r - 2)]
   have ha : 0 < Real.pi * r ^ 2 :=
     mul_pos Real.pi_pos (by linarith)
   have hd : 0 < Real.pi * (r ^ 2 - 2) :=
@@ -160,22 +134,21 @@ theorem laplace_regularization (psi : ℂ → ℂ) {r : ℝ} (hr : 2 < r)
   unfold regularizedIntegral
   ring
 
-def denominator (r : ℝ) : ℂ :=
+private def denominator (r : ℝ) : ℂ :=
   (Real.pi : ℂ) * (r : ℂ) ^ 2 * ((r : ℂ) ^ 2 - 2)
 
-def numerator (psi : ℂ → ℂ) (r : ℝ) : ℂ :=
+private def numerator (psi : ℂ → ℂ) (r : ℝ) : ℂ :=
   144 * ((r : ℂ) ^ 2 - 2) + (r : ℂ) ^ 2 +
     denominator r * regularizedIntegral psi r
 
 /-- The coefficient is a parameter so that the sign convention is explicit. -/
-
 def regularizedRhs (c : ℂ) (psi : ℂ → ℂ) (r : ℝ) : ℂ :=
   c * (Real.sin (Real.pi * r ^ 2 / 2) ^ 2 : ℂ) *
     (144 / ((Real.pi * r ^ 2 : ℝ) : ℂ) +
       1 / ((Real.pi * (r ^ 2 - 2) : ℝ) : ℂ) +
       regularizedIntegral psi r)
 
-theorem denominator_ne_zero {r : ℝ} (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
+private theorem denominator_ne_zero {r : ℝ} (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
     denominator r ≠ 0 := by
   have hp : (Real.pi : ℂ) ≠ 0 := by exact_mod_cast Real.pi_ne_zero
   have hrc : (r : ℂ) ≠ 0 := by exact_mod_cast hr0
@@ -184,8 +157,7 @@ theorem denominator_ne_zero {r : ℝ} (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
   exact mul_ne_zero (mul_ne_zero hp (pow_ne_zero 2 hrc)) hs
 
 /-- Clearing the two explicit denominators creates an analytic expression. -/
-
-theorem denominator_mul_rhs (c : ℂ) (psi : ℂ → ℂ) {r : ℝ}
+private theorem denominator_mul_rhs (c : ℂ) (psi : ℂ → ℂ) {r : ℝ}
     (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
     denominator r * regularizedRhs c psi r =
       c * (Real.sin (Real.pi * r ^ 2 / 2) ^ 2 : ℂ) * numerator psi r := by
@@ -196,42 +168,21 @@ theorem denominator_mul_rhs (c : ℂ) (psi : ℂ → ℂ) {r : ℝ}
   simp only [regularizedRhs, numerator, denominator]
   push_cast
   field_simp [hp, hrc, hs]
-/--
-A sufficient collection of prerequisites, rather than an assertion about
-arbitrary functions. These fields must ultimately be proved from the contour
-definition and modular-form estimates. These prerequisites are not proved in this file.
--/
-
-structure RegularizationHypotheses (c : ℂ) (b : ℝ → ℂ) (psi : ℂ → ℂ) : Prop where
-  regularized_integrable : ∀ r : ℝ, 0 ≤ r →
-    IntegrableOn (bIntegrand psi r) (Set.Ioi (0 : ℝ))
-  analytic_b : AnalyticOnNhd ℝ b (Set.Ioi (0 : ℝ))
-  analytic_regularized :
-    AnalyticOnNhd ℝ (regularizedIntegral psi) (Set.Ioi (0 : ℝ))
-  laplace_above_two : ∀ r : ℝ, 2 < r →
-    b r = c * (Real.sin (Real.pi * r ^ 2 / 2) ^ 2 : ℂ) *
-      ∫ t in Set.Ioi (0 : ℝ),
-        psi (Complex.I * (t : ℂ)) * expKernel (Real.pi * r ^ 2) t
-/--
-Conditional regularization theorem. This is a repaired, stronger-hypothesis
-version of the submitted declaration. All four fields of h are substantive
-prerequisites; in particular convergence and analyticity are not proved here.
--/
-
-theorem b_formula_of_laplace_and_analytic
+/-- Continue the regularized formula from the initial Laplace range. -/
+private theorem b_formula_of_laplace_and_analytic
     (c : ℂ) (b : ℝ → ℂ) (psi : ℂ → ℂ)
-    (h : RegularizationHypotheses c b psi)
-    (r : ℝ) (hr : 0 ≤ r) (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
+    (hb : AnalyticOnNhd ℝ b (Set.Ioi (0 : ℝ)))
+    (hL : AnalyticOnNhd ℝ (regularizedIntegral psi) (Set.Ioi (0 : ℝ)))
+    (hseed : ∀ x : ℝ, 2 < x → b x = regularizedRhs c psi x)
+    (r : ℝ) (hr : 0 < r) (hr2 : r ^ 2 ≠ 2) :
     b r = regularizedRhs c psi r := by
   let D : ℝ → ℝ :=
     fun y => Real.pi * y ^ 2 * (y ^ 2 - 2)
   let A : ℝ → ℝ :=
     fun y => 144 * (y ^ 2 - 2) + y ^ 2
-
   have hC (x z : ℝ) :
       AnalyticAt ℝ (fun _ : ℝ => z) x :=
     analyticAt_const
-
   have hDreal (x : ℝ) : AnalyticAt ℝ D x := by
     have hs : AnalyticAt ℝ (fun y : ℝ => y ^ 2) x :=
       (analyticAt_id :
@@ -239,7 +190,6 @@ theorem b_formula_of_laplace_and_analytic
     simpa only [D] using
       (((hC x Real.pi).fun_mul hs).fun_mul
         (hs.fun_sub (hC x 2)))
-
   have hAreal (x : ℝ) : AnalyticAt ℝ A x := by
     have hs : AnalyticAt ℝ (fun y : ℝ => y ^ 2) x :=
       (analyticAt_id :
@@ -247,7 +197,6 @@ theorem b_formula_of_laplace_and_analytic
     simpa only [A] using
       (((hC x 144).fun_mul
         (hs.fun_sub (hC x 2))).fun_add hs)
-
   have hcast (f : ℝ → ℝ) (x : ℝ)
       (hf : AnalyticAt ℝ f x) :
       AnalyticAt ℝ (fun y : ℝ => (f y : ℂ)) x := by
@@ -260,13 +209,11 @@ theorem b_formula_of_laplace_and_analytic
       Complex.ofRealCLM.analyticAt (f x)
     rw [hm] at hc
     exact AnalyticAt.fun_comp (f := f) (x := x) hc hf
-
   have hDeq (y : ℝ) :
       (D y : ℂ) = denominator y := by
     simp only [D, denominator, Complex.ofReal_mul,
       Complex.ofReal_pow, Complex.ofReal_sub,
       Complex.ofReal_ofNat]
-
   have hNeq :
       (fun y : ℝ =>
         (A y : ℂ) + D y • regularizedIntegral psi y) =
@@ -276,14 +223,12 @@ theorem b_formula_of_laplace_and_analytic
       Complex.real_smul, Complex.ofReal_add,
       Complex.ofReal_mul, Complex.ofReal_pow,
       Complex.ofReal_sub, Complex.ofReal_ofNat]
-
   have hF : AnalyticOnNhd ℝ
       (fun y => denominator y * b y)
       (Set.Ioi (0 : ℝ)) := by
     intro x hx
     simpa only [Complex.real_smul, hDeq] using
-      (hDreal x).fun_smul (h.analytic_b x hx)
-
+      (hDreal x).fun_smul (hb x hx)
   have hG : AnalyticOnNhd ℝ
       (fun y =>
         c * (Real.sin (Real.pi * y ^ 2 / 2) ^ 2 : ℂ) *
@@ -295,11 +240,10 @@ theorem b_formula_of_laplace_and_analytic
           (A y : ℂ) + D y • regularizedIntegral psi y) x :=
       (hcast A x (hAreal x)).fun_add
         ((hDreal x).fun_smul
-          (h.analytic_regularized x hx))
+          (hL x hx))
     have hN : AnalyticAt ℝ (numerator psi) x := by
       rw [hNeq] at hN'
       exact hN'
-
     have hid : AnalyticAt ℝ (fun y : ℝ => y) x :=
       analyticAt_id
     have harg : AnalyticAt ℝ
@@ -315,7 +259,6 @@ theorem b_formula_of_laplace_and_analytic
         (fun y : ℝ =>
           Real.sin (Real.pi * y ^ 2 / 2) ^ 2) x :=
       hsine.fun_pow 2
-
     have hprod : AnalyticAt ℝ
         (fun y : ℝ =>
           (Real.sin (Real.pi * y ^ 2 / 2) ^ 2 : ℝ) •
@@ -324,37 +267,88 @@ theorem b_formula_of_laplace_and_analytic
     simpa only [Complex.real_smul, smul_eq_mul,
       Complex.ofReal_pow, mul_assoc] using
       hprod.fun_const_smul (c := c)
-
   have hlarge : ∀ x : ℝ, 2 < x →
       denominator x * b x =
         c * (Real.sin (Real.pi * x ^ 2 / 2) ^ 2 : ℂ) *
           numerator psi x := by
     intro x hx
-    have hb := h.laplace_above_two x hx
-    rw [laplace_regularization psi hx
-      (h.regularized_integrable x (by linarith))] at hb
-    change b x = regularizedRhs c psi x at hb
-    rw [hb]
+    rw [hseed x hx]
     exact denominator_mul_rhs c psi (r := x)
       (by linarith)
       (by nlinarith [sq_nonneg (x - 2)])
-
   have hcleared :=
     eq_on_positive_of_analytic_of_eq_above_two
-      hF hG hlarge (lt_of_le_of_ne hr (Ne.symm hr0))
-  apply mul_left_cancel₀ (denominator_ne_zero hr0 hr2)
+      hF hG hlarge hr
+  apply mul_left_cancel₀ (denominator_ne_zero hr.ne' hr2)
   exact hcleared.trans
-    (denominator_mul_rhs c psi hr0 hr2).symm
+    (denominator_mul_rhs c psi hr.ne' hr2).symm
 
-/-- The submitted positive sign, now with its required prerequisites. -/
+private theorem expKernel_b_eq (r t : ℝ) :
+    expKernel (Real.pi * r ^ 2) t =
+      Complex.exp (-(Real.pi : ℂ) * ((r ^ 2 : ℝ) : ℂ) * (t : ℂ)) := by
+  simp [expKernel, Complex.ofReal_exp, neg_mul]
 
-theorem b_formula_with_hypotheses
-    (b : ℝ → ℂ) (psi : ℂ → ℂ)
-    (h : RegularizationHypotheses (4 * Complex.I) b psi)
-    (r : ℝ) (hr : 0 ≤ r) (hr0 : r ≠ 0) (hr2 : r ^ 2 ≠ 2) :
-    b r = proposedRhs psi r := by
-  simpa [regularizedRhs, proposedRhs, regularizedIntegral, Complex.ofReal_add,
-    Complex.ofReal_div] using
-    b_formula_of_laplace_and_analytic (4 * Complex.I) b psi h r hr hr0 hr2
+/-- Absolute convergence of the regularized integral in the initial Laplace range. -/
+theorem integrableOn_regularized_b_above_two {r : ℝ} (hr : 2 < r ^ 2) :
+    IntegrableOn (bIntegrand ψI' r) (Set.Ioi (0 : ℝ)) := by
+  have hmain := integrableOn_ψI'_mul_cexp hr
+  have h0 := integrableOn_expKernel
+    (mul_pos Real.pi_pos (show 0 < r ^ 2 by linarith))
+  have h2 := integrableOn_expKernel
+    (mul_pos Real.pi_pos (sub_pos.mpr hr))
+  have hmain' : IntegrableOn
+      (fun t : ℝ => ψI' (Complex.I * (t : ℂ)) * expKernel (Real.pi * r ^ 2) t)
+      (Set.Ioi (0 : ℝ)) := by
+    simpa only [expKernel_b_eq] using hmain
+  convert (hmain'.sub (h0.const_mul (144 : ℂ))).sub h2 using 1
+  exact funext (bIntegrand_eq ψI' r)
+
+/-- The regularized formula for the predefined radial function in the initial Laplace range. -/
+theorem b_regularized_eq_above_two {r : ℝ} (hs : 2 < r ^ 2) :
+    b.RealIntegrals.b' (r ^ 2) = regularizedRhs (-4 * Complex.I) ψI' r := by
+  rw [b'_eq_neg_four_mul_I_mul_sin_sq_mul_integral hs]
+  simp only [← expKernel_b_eq, ← Complex.ofReal_pow]
+  rw [laplace_regularization ψI' hs (integrableOn_regularized_b_above_two hs)]
+  simp only [regularizedRhs, Complex.ofReal_pow]
+
+/-- Absolute convergence at zero implies absolute convergence at every real radius. -/
+theorem integrableOn_regularized_b_of_zero
+    (hzero : IntegrableOn (bIntegrand ψI' 0) (Set.Ioi (0 : ℝ))) (r : ℝ) :
+    IntegrableOn (bIntegrand ψI' r) (Set.Ioi (0 : ℝ)) := by
+  have hkernel : Continuous (expKernel (Real.pi * r ^ 2)) := by
+    unfold expKernel
+    fun_prop
+  have heq (t : ℝ) : bIntegrand ψI' r t =
+      bIntegrand ψI' 0 t * expKernel (Real.pi * r ^ 2) t := by
+    simp [bIntegrand, expKernel, neg_mul]
+  let μ := volume.restrict (Set.Ioi (0 : ℝ))
+  have hbase : Integrable (bIntegrand ψI' 0) μ := hzero
+  change Integrable (bIntegrand ψI' r) μ
+  refine hbase.mono ?_ ?_
+  · rw [show bIntegrand ψI' r = _ from funext heq]
+    exact hbase.aestronglyMeasurable.mul hkernel.aestronglyMeasurable
+  · filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with t ht
+    rw [heq, norm_mul]
+    have hle : ‖expKernel (Real.pi * r ^ 2) t‖ ≤ 1 := by
+      have ht' : 0 ≤ t := (Set.mem_Ioi.mp ht).le
+      rw [expKernel, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_pos (Real.exp_pos _), Real.exp_le_one_iff]
+      exact mul_nonpos_of_nonpos_of_nonneg
+        (neg_nonpos.mpr (mul_nonneg Real.pi_pos.le (sq_nonneg r))) ht'
+    simpa only [mul_one] using mul_le_mul_of_nonneg_left hle (norm_nonneg _)
+
+/-- Proposition 7.41, equation (69), away from the removable singularities
+at `r = 0` and `r ^ 2 = 2`, given analyticity. -/
+theorem b_radial_eq_regularized_laplace_of_analytic
+    (hb : AnalyticOnNhd ℝ (fun r : ℝ => b.RealIntegrals.b' (r ^ 2))
+      (Set.Ioi (0 : ℝ)))
+    (hL : AnalyticOnNhd ℝ (regularizedIntegral ψI') (Set.Ioi (0 : ℝ)))
+    {r : ℝ} (hr : 0 < r) (hr2 : r ^ 2 ≠ 2) :
+    b.RealIntegrals.b' (r ^ 2) = regularizedRhs (-4 * Complex.I) ψI' r := by
+  refine b_formula_of_laplace_and_analytic _ _ _ hb hL ?_ r hr hr2
+  intro x hx
+  exact b_regularized_eq_above_two (by nlinarith [sq_nonneg (x - 2)])
+
+end MagicFunction
 
 end
