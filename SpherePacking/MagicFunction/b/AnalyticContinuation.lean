@@ -47,48 +47,16 @@ have hψ : (fun t : ℝ ↦ ψI' (I * t)) = ψI.resToImagAxis := by
 
 theorem integrableOn_ψI'_mul_cexp {s : ℝ} (hr : 2 < s) :
     IntegrableOn (fun t : ℝ ↦ ψI' (I * t) * cexp (-π * s * t)) (Ioi 0) := by
-  let f : ℝ → ℂ := fun t ↦ ψI' (I * t) * cexp (-π * s * t)
-  have hcont : ContinuousOn f (Ici 0) :=
-    ψI'_imaginaryAxis_continuousOn.mul (by fun_prop)
-  have hNorm := tendsto_resToImagAxis_of_tendsto_atImInfty ψI_mul_exp_tendsto
-  have hb := Metric.tendsto_atTop.mp hNorm 1 zero_lt_one
-  obtain ⟨A, hA⟩ := hb
-  let B := max A 1
-  have hB : 0 ≤ B := (zero_le_one.trans (le_max_right A 1))
-  have hfinite : IntegrableOn f (Ioc 0 B) :=
-    (hcont.mono (t := Icc 0 B) (fun _ ht ↦ ht.1) |>.integrableOn_compact isCompact_Icc).mono_set
-      Ioc_subset_Icc_self
-  have hdecay : -(π * (s - 2)) < 0 :=
-    neg_lt_zero.mpr (mul_pos Real.pi_pos (sub_pos.mpr hr))
-  have hmajorant := (integrableOn_exp_mul_Ioi hdecay B).const_mul (2 : ℝ)
-  have htail : IntegrableOn f (Ioi B) := by
-    apply hmajorant.mono'
-      ((hcont.mono (t := Ioi B) (fun _ ht ↦ hB.trans ht.le)).aestronglyMeasurable measurableSet_Ioi)
-    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with t ht
-    have ht' : 0 < t := hB.trans_lt ht
-    have h := hA t ((le_max_left A 1).trans ht.le)
-    have he : 2 * (π : ℂ) * I * (I * (t : ℂ)) = -(2 * π * (t : ℂ)) := by
-      linear_combination 2 * (π : ℂ) * (t : ℂ) * I_sq
-    simp only [Function.resToImagAxis_apply, ResToImagAxis, ht', ↓reduceDIte,
-      he] at h
-    rw [← ψI'_def (show 0 < (I * (t : ℂ)).im by simpa using ht')] at h
-    have hnorm : ‖ψI' (I * (t : ℂ)) * cexp (-(2 * π * (t : ℂ)))‖ ≤ 2 := by
-      calc
-        _ = ‖ψI' (I * (t : ℂ)) * cexp (-(2 * π * (t : ℂ))) - 1 + 1‖ := by
-          rw [sub_add_cancel]
-        _ ≤ _ := norm_add_le _ _
-        _ ≤ 2 := by rw [norm_one]; rw [dist_eq_norm] at h; linarith
-    have hsplit : f t = (ψI' (I * (t : ℂ)) * cexp (-(2 * π * (t : ℂ)))) *
-        cexp (-(π * ((s : ℂ) - 2)) * (t : ℂ)) := by
-      dsimp [f]
-      rw [mul_assoc (ψI' (I * (t : ℂ))), ← Complex.exp_add]
-      congr 2
-      ring
-    rw [hsplit, norm_mul, Complex.norm_exp]
-    simpa [Complex.mul_re, Complex.sub_re, Complex.mul_im] using
-      mul_le_mul_of_nonneg_right hnorm
-        (Real.exp_nonneg ((-(π * ((s : ℂ) - 2)) * (t : ℂ)).re))
-  exact (Ioc_union_Ioi_eq_Ioi hB) ▸ hfinite.union htail
+ have hO : (fun t : ℝ ↦ ψI' (I * t)) =O[atTop] fun t ↦ rexp (2 * π * t) := by
+    refine (((tendsto_resToImagAxis_of_tendsto_atImInfty ψI_mul_exp_tendsto).isBigO_one ℝ).mul
+      (Complex.isBigO_ofReal_left.2 (Asymptotics.isBigO_refl (fun t ↦ rexp (2 * π * t)) _))).congr'
+      ?_ (.of_forall fun _ ↦ one_mul _)
+    filter_upwards [eventually_gt_atTop 0] with t ht
+    simp [ResToImagAxis, ht, ψI', mul_assoc, ← Complex.exp_add, ← mul_assoc I I]
+  exact ((integrableOn_exp_neg_smul_of_isBigO_exp (b := π * s)
+    (ψI'_imaginaryAxis_continuousOn.locallyIntegrableOn measurableSet_Ici) hO
+    (by nlinarith [pi_pos])).mono_set Ioi_subset_Ici_self).congr_fun
+    (fun t _ ↦ by simp [Complex.real_smul, mul_comm]) measurableSet_Ioi
 
 open b.RealIntegrals in
 /-- Combined unbounded contour deformation from Proposition 7.40. The six finite and
