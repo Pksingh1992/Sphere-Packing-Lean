@@ -27,62 +27,23 @@ namespace MagicFunction
 
 private theorem ψI'_imaginaryAxis_continuousOn :
     ContinuousOn (fun t : ℝ ↦ ψI' (I * t)) (Ici 0) := by
-  have hS : Tendsto (fun t : ℝ ↦ ψS' (I * t)) atTop (𝓝 0) := by
-    have hNorm := tendsto_resToImagAxis_of_tendsto_atImInfty ψS_div_exp_tendsto
-    have hExp : Tendsto (fun t : ℝ ↦ cexp (-(π : ℂ) * (t : ℂ))) atTop (𝓝 0) := by
-      apply tendsto_zero_iff_norm_tendsto_zero.mpr
-      have he (t : ℝ) : ‖cexp (-(π : ℂ) * (t : ℂ))‖ = rexp (-π * t) := by
-        simp [Complex.norm_exp, Complex.mul_re]
-      simp_rw [he]
-      exact Real.tendsto_exp_atBot.comp
-        (tendsto_id.const_mul_atTop_of_neg (neg_lt_zero.mpr Real.pi_pos))
-    have hm := hNorm.mul hExp
-    rw [mul_zero] at hm
-    refine hm.congr' ?_
-    filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
-    have he : (π : ℂ) * I * (I * (t : ℂ)) = -π * (t : ℂ) := by
-      linear_combination (π : ℂ) * (t : ℂ) * I_sq
-    simp only [Function.resToImagAxis_apply, ResToImagAxis, ht, ↓reduceDIte,
-      he, ψS', show 0 < (I * (t : ℂ)).im by simpa using ht]
-    exact div_mul_cancel₀ _ (Complex.exp_ne_zero _)
+have hψ : (fun t : ℝ ↦ ψI' (I * t)) = ψI.resToImagAxis := by
+    ext t; by_cases ht : 0 < t <;> simp [ψI', ResToImagAxis, ht]
+  have hS := tendsto_resToImagAxis_of_tendsto_atImInfty (F := ψS)
+    ((ψS_div_exp_tendsto.mul (UpperHalfPlane.qParam_tendsto_atImInfty two_pos)).congr fun z ↦ by
+      rw [Function.Periodic.qParam]; push_cast; field_simp)
+  rw [hψ]
   intro t ht
-  rcases eq_or_lt_of_le (mem_Ici.mp ht) with rfl | ht'
-  · have hcomp := hS.comp tendsto_inv_nhdsGT_zero
-    have hkernel : Tendsto (fun t : ℝ ↦ (I * (t : ℂ)) ^ 2) (𝓝[>] 0) (𝓝 0) := by
-      have hc : Continuous (fun t : ℝ ↦ (I * (t : ℂ)) ^ 2) := by fun_prop
-      simpa [ContinuousWithinAt] using
-        (hc.continuousAt (x := (0 : ℝ))).continuousWithinAt (s := Ioi 0)
-    have h := hcomp.mul hkernel
-    rw [zero_mul] at h
-    have hRight : Tendsto (fun t : ℝ ↦ ψI' (I * t)) (𝓝[>] 0) (𝓝 0) := by
-      refine h.congr' ?_
-      filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with t ht
-      have ht' : 0 < t := ht
-      have hz : (I * (t : ℂ)).im > 0 := by simpa using ht'
-      rw [ψS_slash_S_explicit hz]
-      change ψS' (I * (↑(t⁻¹) : ℂ)) * _ = ψS' (-1 / (I * (t : ℂ))) * _
-      rw [Complex.ofReal_inv]
-      have he : I * (t : ℂ)⁻¹ = -1 / (I * (t : ℂ)) := by
-        field_simp [Complex.I_ne_zero, show (t : ℂ) ≠ 0 by exact_mod_cast ht'.ne']
-        linear_combination I_sq
-      rw [he]
-    have hzero : ψI' (I * ((0 : ℝ) : ℂ)) = 0 := by simp [ψI']
-    change Tendsto _ (𝓝[Ici 0] 0) (𝓝 (ψI' (I * ((0 : ℝ) : ℂ))))
-    rw [hzero, ← insert_Ioi, nhdsWithin_insert]
-    refine tendsto_sup.2 ⟨?_, hRight⟩
-    simpa only [hzero] using tendsto_pure_nhds (fun t : ℝ ↦ ψI' (I * t)) 0
-  · let g : Ioi (0 : ℝ) → UpperHalfPlane :=
-      fun x ↦ ⟨I * (x.val : ℂ), by simpa using (show 0 < (x : ℝ) from x.property)⟩
-    have hg : Continuous g := by
-      apply UpperHalfPlane.isEmbedding_coe.continuous_iff.mpr
-      change Continuous (fun x : Ioi (0 : ℝ) ↦ I * (x.val : ℂ))
-      fun_prop
-    have hc : ContinuousOn (fun x : ℝ ↦ ψI' (I * x)) (Ioi 0) := by
-      rw [continuousOn_iff_continuous_domRestrict]
-      convert ψI_continuous.comp hg using 1
-      ext x
-      exact ψI'_def (by simpa using (show 0 < (x : ℝ) from x.property))
-    exact (hc t ht').continuousAt (Ioi_mem_nhds ht') |>.continuousWithinAt
+  obtain ht | rfl := (mem_Ici.1 ht).lt_or_eq
+  · exact (ResToImagAxis.Differentiable ψI ψI_mdifferentiable t ht).continuousAt.continuousWithinAt
+  rw [← continuousWithinAt_Ioi_iff_Ici, ContinuousWithinAt,
+    show ψI.resToImagAxis 0 = 0 by simp [ResToImagAxis]]
+  refine (((Continuous.tendsto' (f := fun t : ℝ ↦ I ^ 2 * (t : ℂ) ^ 2) (by fun_prop) 0 0 
+    (by simp)).mono_left nhdsWithin_le_nhds).zero_mul_isBoundedUnder_le
+    (hS.comp tendsto_inv_nhdsGT_zero).norm.isBoundedUnder_le).congr' ?_
+  filter_upwards [self_mem_nhdsWithin] with t (ht : 0 < t)
+  rw [← ψS_slash_S, ResToImagAxis.SlashActionS _ _ ht]
+  simp
 
 theorem integrableOn_ψI'_mul_cexp {s : ℝ} (hr : 2 < s) :
     IntegrableOn (fun t : ℝ ↦ ψI' (I * t) * cexp (-π * s * t)) (Ioi 0) := by
