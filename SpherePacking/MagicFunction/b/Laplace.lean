@@ -1,9 +1,14 @@
+/-
+Copyright (c) 2026 mathlib contributors. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: mathlib contributors:
+-/
 module
 
 public import SpherePacking.MagicFunction.b.AnalyticContinuation
-
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Deriv
+import Mathlib.MeasureTheory.Integral.Asymptotics
 
 /-!
 # Regularized Laplace formula for `b`
@@ -14,7 +19,7 @@ The continuation proof clears the denominators before applying the real analytic
 
 @[expose] public section
 
-open MeasureTheory
+open Filter MeasureTheory
 open scoped Real Topology
 
 noncomputable section
@@ -336,6 +341,30 @@ theorem integrableOn_regularized_b_of_zero
       exact mul_nonpos_of_nonpos_of_nonneg
         (neg_nonpos.mpr (mul_nonneg Real.pi_pos.le (sq_nonneg r))) ht'
     simpa only [mul_one] using mul_le_mul_of_nonneg_left hle (norm_nonneg _)
+
+/-- The regularized integrand is absolutely integrable even at radius zero. -/
+theorem integrableOn_regularized_b_zero :
+    IntegrableOn (bIntegrand ψI' 0) (Set.Ioi (0 : ℝ)) := by
+  have hcont : ContinuousOn (bIntegrand ψI' 0) (Set.Ici 0) := by
+    have he (t : ℝ) : bIntegrand ψI' 0 t =
+        ψI' (Complex.I * t) - 144 - (Real.exp (2 * Real.pi * t) : ℂ) := by
+      simp [bIntegrand]
+    rw [funext he]
+    exact (ψI'_imaginaryAxis_continuousOn.sub continuousOn_const).sub (by fun_prop)
+  have hO : bIntegrand ψI' 0 =O[atTop] fun t : ℝ ↦ Real.exp (-Real.pi * t) := by
+    apply ψI'_I_mul_sub_isBigO_atTop.congr_left
+    intro t
+    simp only [bIntegrand, zero_pow two_ne_zero, mul_zero, zero_mul, Real.exp_zero,
+      Complex.ofReal_one, mul_one, Complex.ofReal_exp, Complex.ofReal_mul, Complex.ofReal_ofNat]
+    ring
+  have hExp := integrableOn_exp_mul_Ioi (neg_lt_zero.mpr Real.pi_pos) 0
+  exact ((hcont.locallyIntegrableOn measurableSet_Ici).integrableOn_of_isBigO_atTop hO
+    ⟨Set.Ioi 0, Ioi_mem_atTop 0, hExp⟩).mono_set Set.Ioi_subset_Ici_self
+
+/-- The regularized integral in Proposition 7.41 converges absolutely at every radius. -/
+theorem integrableOn_regularized_b (r : ℝ) :
+    IntegrableOn (bIntegrand ψI' r) (Set.Ioi (0 : ℝ)) :=
+  integrableOn_regularized_b_of_zero integrableOn_regularized_b_zero r
 
 /-- Proposition 7.41, equation (69), away from the removable singularities
 at `r = 0` and `r ^ 2 = 2`, given analyticity. -/
