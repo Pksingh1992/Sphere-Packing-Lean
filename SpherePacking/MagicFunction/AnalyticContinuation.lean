@@ -38,6 +38,10 @@ namespace MagicFunction.DoubleZeroes
 noncomputable def expPoly (n : ℕ) (a b : ℕ → ℂ) (t : ℝ) : ℂ :=
   ∑ k ∈ range (n + 1), (a k + t * b k) * cexp (2 * π * k * t)
 
+@[simp] lemma expPoly_apply (n : ℕ) (a b : ℕ → ℂ) (t : ℝ) :
+    expPoly n a b t = ∑ k ∈ range (n + 1), (a k + t * b k) * cexp (2 * π * k * t) :=
+  rfl
+
 variable {ψ : ℂ → ℂ} {n : ℕ} {a b : ℕ → ℂ} {C : ℝ} {s : ℂ}
 
 /-- `W(s) = ∫₀^∞ ψ(it) e^{-πst} dt` converges absolutely for `Re s > 2n`. -/
@@ -75,6 +79,14 @@ theorem analyticOnNhd_integral_sub_expPoly (hC : 0 < C)
     (hexp : (fun t : ℝ ↦ ψ (I * t) - expPoly n a b t) =O[atTop] fun t ↦ rexp (-C * t)) :
     AnalyticOnNhd ℂ (fun s : ℂ ↦ ∫ t in Ioi (0 : ℝ),
       (ψ (I * t) - expPoly n a b t) * cexp (-π * s * t)) {s | -C / π < s.re} := by
+  sorry
+
+/-- `sin(πs/2)^2 * ∫₀^∞ ψ(it) e^{-πst} dt` is holomorphic on `Re s > -C/π`. -/
+theorem analyticOnNhd_sin_sq_mul_integral (hC : 0 < C)
+    (hloc : LocallyIntegrableOn (fun t : ℝ ↦ ψ (I * t)) (Ici 0))
+    (hexp : (fun t : ℝ ↦ ψ (I * t) - expPoly n a b t) =O[atTop] fun t ↦ rexp (-C * t)) :
+      AnalyticOnNhd ℂ (fun s : ℂ ↦ (sin (π * s / 2)) ^ 2 * ∫ t in Ioi (0 : ℝ),
+        ψ (I * t) * cexp (-π * s * t)) {s | -C / π < s.re} := by
   sorry
 
 end MagicFunction.DoubleZeroes
